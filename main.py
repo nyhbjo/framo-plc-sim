@@ -1,5 +1,5 @@
 import asyncio
-from asyncua import Server, ua, Client, Node
+from asyncua import Server, ua, Client
 from asyncua.common.methods import uamethod
 #from opcua.common.type_dictionary_buider import get_ua_class
 from OPC_Init_AnalogValue import OPCInitAnalogValue
@@ -163,11 +163,15 @@ async def main():
     minimum_pump_power = 3
     minimum_pump_torque = 7
     minimum_pump_voltage = 400
-    startup_pump_velocity = 40
-    max_pump_velocity = 80
+    startup_pump_velocity = 20
+    #max_pump_velocity = 80
+    inletpump_speed = 0.0    
 
-    try:
-        async with server:
+    #client = Client(url)
+
+    async with server:
+        try:
+            #await client.connect()
             while True:
                 await asyncio.sleep(2)
                 if not await toggle.active.get_value() == toggle_last: # HeartBeat
@@ -293,7 +297,7 @@ async def main():
 
                     case "start":
                         ## Starting - Run pump at minimum speed
-                        #print("Case - start")
+                        print("Case - start")
                         if not inletpump_data_written:
                             await pump_state_unavailable.active.write_value(False)
                             await pump_state_available.active.write_value(False)
@@ -310,23 +314,23 @@ async def main():
                         await motor_voltage.value.write_value(minimum_pump_voltage,ua.VariantType.Double)
                         await motor_torque.value.write_value(minimum_pump_torque,ua.VariantType.Double)
                         await pump_stopped.active.write_value(False)
-                        asyncio.sleep(2)
+                        await asyncio.sleep(2)
 
                         # Vacuum system simulation
                         await status_v001.active.write_value(False)
                         await status_v002.active.write_value(True)
                         await pressure_compressed_air.value.write_value(6.55,ua.VariantType.Double)
                         await pressure_compressed_air.engineering_units.write_value("bar")
-                        asyncio.sleep(3)
+                        await asyncio.sleep(3)
                         await level_switch_lsl.active.write_value(False)
                         await level_switch_lsh.active.write_value(False)
                         
-                        await dc_undervoltage_error.active.write_value(simulation.dc_undervoltage_error.get_value())
-                        await drive_communication.active.write_value(simulation.drive_communication_error.get_value())
-                        await drive_not_in_remote.active.write_value(simulation.drive_not_in_remote.get_value())
-                        await emergency_stop.active.write_value(simulation.emergency_stop.get_value())
-                        await motor_temperature.active.write_value(simulation.motor_temperature.get_value())
-                        await UPS_supply_error.active.write_value(simulation.ups_supply_error.get_value())
+                        await dc_undervoltage_error.active.write_value(await simulation.dc_undervoltage_error.get_value())
+                        await drive_communication.active.write_value(await simulation.drive_communication_error.get_value())
+                        await drive_not_in_remote.active.write_value(await simulation.drive_not_in_remote.get_value())
+                        await emergency_stop.active.write_value(await simulation.emergency_stop.get_value())
+                        await motor_temperature.active.write_value(await simulation.motor_temperature.get_value())
+                        await UPS_supply_error.active.write_value(await simulation.ups_supply_error.get_value())
 
                         if  await drive_error.active.get_value() \
                             or await motor_temperature.active.get_value() \
@@ -341,7 +345,7 @@ async def main():
 
                     case "ramp_up_speed":
                     ## Starting - ramp up speed
-                        #print("Ramp up speed")
+                        print("Ramp up speed")
                         if not inletpump_data_written:
                             await pump_state_start.active.write_value(True)
                             inletpump_speed = 0.0
@@ -349,8 +353,10 @@ async def main():
                             start_time = int(time.time())
                             inletpump_data_written = True
                         new_time = int(time.time())
+                        print(f"inletpump_speed = {inletpump_speed}")
 
                         if new_time-start_time >= 1:
+                        #await asyncio.sleep(1)
                             inletpump_speed = inletpump_speed + 2   ## increase 2 rpm per second
                             #print(f"Starting - rpm = {inletpump_speed} - Ref = {startup_pump_velocity:.3f}")
                             await motor_frequency.value.write_value(50/80*inletpump_speed,ua.VariantType.Double)
@@ -360,13 +366,13 @@ async def main():
                             await motor_velocity.value.write_value(inletpump_speed,ua.VariantType.Double)
                             await motor_voltage.value.write_value(400.0,ua.VariantType.Double)
 
-                        await drive_error.active.write_value(simulation.drive_error.get_value())
-                        await dc_undervoltage_error.active.write_value(simulation.dc_undervoltage_error.get_value())
-                        await drive_communication.active.write_value(simulation.drive_communication_error.get_value())
-                        await drive_not_in_remote.active.write_value(simulation.drive_not_in_remote.get_value())
-                        await emergency_stop.active.write_value(simulation.emergency_stop.get_value())
-                        await motor_temperature.active.write_value(simulation.motor_temperature.get_value())
-                        await UPS_supply_error.active.write_value(simulation.ups_supply_error.get_value())
+                            await drive_error.active.write_value(await simulation.drive_error.get_value())
+                            await dc_undervoltage_error.active.write_value(await simulation.dc_undervoltage_error.get_value())
+                            await drive_communication.active.write_value(await simulation.drive_communication_error.get_value())
+                            await drive_not_in_remote.active.write_value(await simulation.drive_not_in_remote.get_value())
+                            await emergency_stop.active.write_value(await simulation.emergency_stop.get_value())
+                            await motor_temperature.active.write_value(await simulation.motor_temperature.get_value())
+                            await UPS_supply_error.active.write_value(await simulation.ups_supply_error.get_value())
                         #print(f"ramp1 - speed = {inletpump_speed}")                    
                         if  await drive_error.active.get_value() \
                                 or await motor_temperature.active.get_value() \
@@ -384,7 +390,7 @@ async def main():
 
                     case "remote":
                     ## Ramped up to reference speed
-                        #print("Case - remote")
+                        print("Case - remote")
                         if not inletpump_data_written:
                             await pump_state_unavailable.active.write_value(False)
                             await pump_state_available.active.write_value(False)
@@ -393,15 +399,20 @@ async def main():
                             await pump_state_stop.active.write_value(False)
                             await pump_state_hold.active.write_value(False)
                             await pump_state_lockdown.active.write_value(False)
+                            #print("Remote - pump available")
                             await pump_stopped.active.write_value(False)
+                            #print("Remote - pump not stopped")
                             start_time = int(time.time())
                             inletpump_data_written = True
 
                         new_time = int(time.time())
                         inletpump_speed = await motor_velocity.value.get_value()
+                        #print(f"Remote - current rpm = {inletpump_speed}" )
                         inletpump_speed_sp = await speed_sp.value.get_value()
+                        print(f"Remote - speed SP = {inletpump_speed_sp}")  
 
-                        if new_time-start_time >= 1:
+                        if new_time - start_time >= 1:
+                            print(f"Remote - rpm = {inletpump_speed} - SP = {inletpump_speed_sp}")
                             start_time = int(time.time())
                             if inletpump_speed > inletpump_speed_sp + 2:
                                 inletpump_speed = inletpump_speed - 2   ## change 2 rpm per second
@@ -410,19 +421,21 @@ async def main():
                             else:
                                 inletpump_speed = inletpump_speed + (inletpump_speed_sp-inletpump_speed)/2
                             await motor_frequency.value.write_value(50/15*inletpump_speed,ua.VariantType.Double)
+                            print(f"Set motor frequency to {50/15*inletpump_speed:.3f} Hz")
                             await motor_current.value.write_value(4*inletpump_speed,ua.VariantType.Double)
                             await motor_power.value.write_value(120/15*inletpump_speed,ua.VariantType.Double)
                             await motor_torque.value.write_value(12/15*inletpump_speed,ua.VariantType.Double)
                             await motor_velocity.value.write_value(inletpump_speed,ua.VariantType.Double)
                             await motor_voltage.value.write_value(399,ua.VariantType.Double)
 
-                        await drive_error.active.write_value(simulation.drive_error.get_value())
-                        await dc_undervoltage_error.active.write_value(simulation.dc_undervoltage_error.get_value())
-                        await drive_communication.active.write_value(simulation.drive_communication_error.get_value())
-                        await drive_not_in_remote.active.write_value(simulation.drive_not_in_remote.get_value())
-                        await emergency_stop.active.write_value(simulation.emergency_stop.get_value())
-                        await motor_temperature.active.write_value(simulation.motor_temperature.get_value())
-                        await UPS_supply_error.active.write_value(simulation.ups_supply_error.get_value())
+                        await drive_error.active.write_value(await simulation.drive_error.get_value())
+                        print(f"drive error = {await simulation.drive_error.get_value()}")
+                        await dc_undervoltage_error.active.write_value(await simulation.dc_undervoltage_error.get_value())
+                        await drive_communication.active.write_value(await simulation.drive_communication_error.get_value())
+                        await drive_not_in_remote.active.write_value(await simulation.drive_not_in_remote.get_value())
+                        await emergency_stop.active.write_value(await simulation.emergency_stop.get_value())
+                        await motor_temperature.active.write_value(await simulation.motor_temperature.get_value())
+                        await UPS_supply_error.active.write_value(await simulation.ups_supply_error.get_value())
                         
                         if  await drive_error.active.get_value() \
                                 or await motor_temperature.active.get_value() \
@@ -493,13 +506,13 @@ async def main():
                             await motor_velocity.value.write_value(inletpump_speed,ua.VariantType.Double)
                             await motor_voltage.value.write_value(400.0,ua.VariantType.Double)
 
-                        await drive_error.active.write_value(simulation.drive_error.get_value())
-                        await dc_undervoltage_error.active.write_value(simulation.dc_undervoltage_error.get_value())
-                        await drive_communication.active.write_value(simulation.drive_communication_error.get_value())
-                        await drive_not_in_remote.active.write_value(simulation.drive_not_in_remote.get_value())
-                        await emergency_stop.active.write_value(simulation.emergency_stop.get_value())
-                        await motor_temperature.active.write_value(simulation.motor_temperature.get_value())
-                        await UPS_supply_error.active.write_value(simulation.ups_supply_error.get_value())
+                        await drive_error.active.write_value(await simulation.drive_error.get_value())
+                        await dc_undervoltage_error.active.write_value(await simulation.dc_undervoltage_error.get_value())
+                        await drive_communication.active.write_value(await simulation.drive_communication_error.get_value())
+                        await drive_not_in_remote.active.write_value(await simulation.drive_not_in_remote.get_value())
+                        await emergency_stop.active.write_value(await simulation.emergency_stop.get_value())
+                        await motor_temperature.active.write_value(await simulation.motor_temperature.get_value())
+                        await UPS_supply_error.active.write_value(await simulation.ups_supply_error.get_value())
                         
                         if  await drive_error.active.get_value() \
                                 or await motor_temperature.active.get_value() \
@@ -514,7 +527,7 @@ async def main():
 
                     case "lockdown":
                             #print("Case - lockdown")
-                            asyncio.sleep(5)
+                            await asyncio.sleep(5)
                             await motor_frequency.value.write_value(0,ua.VariantType.Double)
                             await motor_current.value.write_value(0,ua.VariantType.Double)
                             await motor_power.value.write_value(0,ua.VariantType.Double)
@@ -532,15 +545,19 @@ async def main():
                         break
                 
             
-    except KeyboardInterrupt:
-        print("Server keyboard interrupt")
-        #server.stop()
-    except Exception:
-        print("Exception stop")
-        #server.stop()
-    finally:
-        server.stop()
-        print("Server stopped")
-        
+        except KeyboardInterrupt:
+            print("Server keyboard interrupt")
+            #await server.stop()
+        except ua.UaError as e:
+            print("UaError stop:", e)
+            await server.stop()
+        except Exception:
+            print("Exception stop")
+            #server.stop()
+        finally:
+            #await client.disconnect()
+            await server.stop()
+            print("Server stopped")
+            
 if __name__ == "__main__":
     asyncio.run(main())
